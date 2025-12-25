@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clase 7: Taller de Arquitectura Conceptual</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .gradient-bg {
+            background: linear-gradient(135deg, #1a73e8 0%, #4285f4 100%);
+        }
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .step-connector {
+            position: absolute;
+            top: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            height: 100%;
+            width: 2px;
+            background-color: #e5e7eb;
+            z-index: -1;
+        }
+        @media (min-width: 768px) {
+            .step-connector {
+                top: 50%;
+                left: 0;
+                width: 100%;
+                height: 2px;
+                transform: translateY(-50%);
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <!-- Hero Header -->
+    <header class="gradient-bg text-white pb-24 pt-12 px-6 relative overflow-hidden">
+        <div class="absolute top-0 right-0 opacity-10 transform translate-x-1/4 -translate-y-1/4">
+            <i class="fa-solid fa-cloud text-9xl"></i>
+        </div>
+        <div class="max-w-6xl mx-auto relative z-10">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+                <div>
+                    <span class="bg-white/20 px-3 py-1 rounded-full text-sm font-semibold uppercase tracking-wider border border-white/30">Integración CDL</span>
+                    <h1 class="text-4xl md:text-5xl font-bold mt-4 mb-2">Clase 7: Taller de Arquitectura</h1>
+                    <p class="text-xl text-blue-100 max-w-2xl">Aplicación y Síntesis de los 6 Módulos. De la teoría a la práctica.</p>
+                </div>
+                <div class="mt-6 md:mt-0 bg-white/10 backdrop-blur-md rounded-lg p-4 border border-white/20 text-center">
+                    <div class="text-3xl font-bold">120</div>
+                    <div class="text-sm opacity-80">Minutos</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="max-w-6xl mx-auto px-4 -mt-16 relative z-20 mb-20">
+        
+        <!-- Timeline / Agenda -->
+        <div class="bg-white rounded-2xl shadow-xl p-8 mb-12">
+            <h2 class="text-lg font-bold text-slate-500 uppercase mb-8 tracking-wide border-b pb-2">Agenda de la Sesión</h2>
+            <div class="relative">
+                <div class="hidden md:block absolute top-1/2 left-0 w-full h-1 bg-slate-100 -translate-y-1/2 z-0"></div>
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-6 relative z-10">
+                    <!-- Step 1 -->
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:border-blue-400 transition-colors text-center group">
+                        <div class="w-10 h-10 mx-auto bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold mb-3 group-hover:bg-blue-600 group-hover:text-white transition-colors">1</div>
+                        <h3 class="font-bold text-slate-800">Bienvenida</h3>
+                        <p class="text-xs text-slate-500 mt-1">10 min</p>
+                        <p class="text-xs mt-2 text-slate-600">Objetivos y conexión</p>
+                    </div>
+                    <!-- Step 2 -->
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:border-blue-400 transition-colors text-center group">
+                        <div class="w-10 h-10 mx-auto bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold mb-3 group-hover:bg-indigo-600 group-hover:text-white transition-colors">2</div>
+                        <h3 class="font-bold text-slate-800">Caso GastroCloud</h3>
+                        <p class="text-xs text-slate-500 mt-1">15 min</p>
+                        <p class="text-xs mt-2 text-slate-600">Presentación requisitos</p>
+                    </div>
+                    <!-- Step 3 -->
+                    <div class="bg-white p-4 rounded-xl border-2 border-blue-500 shadow-md hover:shadow-lg transition-all transform scale-105 text-center relative">
+                        <div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-[10px] px-2 py-0.5 rounded-full">Core</div>
+                        <div class="w-10 h-10 mx-auto bg-blue-600 text-white rounded-full flex items-center justify-center font-bold mb-3">3</div>
+                        <h3 class="font-bold text-slate-800">Dinámica Grupal</h3>
+                        <p class="text-xs text-slate-500 mt-1">60 min</p>
+                        <p class="text-xs mt-2 text-slate-600">Diseño de Arquitectura</p>
+                    </div>
+                    <!-- Step 4 -->
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:border-blue-400 transition-colors text-center group">
+                        <div class="w-10 h-10 mx-auto bg-purple-100 text-purple-600 rounded-full flex items-center justify-center font-bold mb-3 group-hover:bg-purple-600 group-hover:text-white transition-colors">4</div>
+                        <h3 class="font-bold text-slate-800">Debate</h3>
+                        <p class="text-xs text-slate-500 mt-1">35 min</p>
+                        <p class="text-xs mt-2 text-slate-600">Puesta en común</p>
+                    </div>
+                    <!-- Step 5 -->
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:border-blue-400 transition-colors text-center group">
+                        <div class="w-10 h-10 mx-auto bg-green-100 text-green-600 rounded-full flex items-center justify-center font-bold mb-3 group-hover:bg-green-600 group-hover:text-white transition-colors">5</div>
+                        <h3 class="font-bold text-slate-800">Cierre</h3>
+                        <p class="text-xs text-slate-500 mt-1">5 min</p>
+                        <p class="text-xs mt-2 text-slate-600">Próximos pasos</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- The Case Study Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+            <!-- Case Card -->
+            <div class="lg:col-span-1 bg-slate-900 text-white rounded-2xl p-8 shadow-xl relative overflow-hidden">
+                <div class="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-yellow-400 rounded-full blur-2xl opacity-20"></div>
+                <div class="relative z-10">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="bg-white/10 p-3 rounded-lg">
+                            <i class="fa-solid fa-utensils text-2xl text-yellow-400"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-2xl font-bold">GastroCloud</h2>
+                            <p class="text-slate-400 text-sm">Startup Case Study</p>
+                        </div>
+                    </div>
+                    <p class="mb-6 text-slate-300 leading-relaxed">
+                        Una startup que busca crear una app revolucionaria para descubrir restaurantes. Necesitan una arquitectura robusta desde el día uno.
+                    </p>
+                    <h4 class="font-bold text-yellow-400 mb-3 text-sm uppercase">Requisitos de Negocio</h4>
+                    <ul class="space-y-3 text-sm">
+                        <li class="flex items-start gap-3">
+                            <i class="fa-solid fa-bolt text-blue-400 mt-1"></i>
+                            <span>Rápida y escalable (millones de usuarios).</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fa-solid fa-camera text-pink-400 mt-1"></i>
+                            <span>Subida de fotos y reseñas de platos.</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fa-solid fa-brain text-purple-400 mt-1"></i>
+                            <span>Recomendaciones con IA y análisis de sentimientos.</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fa-solid fa-shield-halved text-green-400 mt-1"></i>
+                            <span>Seguridad de datos y control de costos.</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- The Challenge Grid (6 Modules) -->
+            <div class="lg:col-span-2">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-2xl font-bold text-slate-800">El Desafío: 6 Módulos, 6 Decisiones</h2>
+                    <span class="text-sm bg-blue-50 text-blue-600 px-3 py-1 rounded-full font-medium">Trabajo en Grupo</span>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- M1 -->
+                    <div class="bg-white p-5 rounded-xl border-l-4 border-blue-500 shadow-sm hover:shadow-md transition-shadow card-hover">
+                        <div class="flex justify-between items-start mb-3">
+                            <span class="text-xs font-bold text-blue-500 uppercase">Módulo 1: Transformación</span>
+                            <i class="fa-solid fa-rocket text-slate-300"></i>
+                        </div>
+                        <h3 class="font-bold text-slate-800 mb-2">OpEx vs CapEx</h3>
+                        <p class="text-sm text-slate-600">¿Por qué la nube (OpEx) es vital para esta startup en lugar de comprar servidores (CapEx)?</p>
+                    </div>
+
+                    <!-- M4 -->
+                    <div class="bg-white p-5 rounded-xl border-l-4 border-purple-500 shadow-sm hover:shadow-md transition-shadow card-hover">
+                        <div class="flex justify-between items-start mb-3">
+                            <span class="text-xs font-bold text-purple-500 uppercase">Módulo 4: Modernización</span>
+                            <i class="fa-solid fa-server text-slate-300"></i>
+                        </div>
+                        <h3 class="font-bold text-slate-800 mb-2">Plataforma de Cómputo</h3>
+                        <p class="text-sm text-slate-600">Para el backend: ¿VMs, GKE o Cloud Run/Serverless? Justifique su elección.</p>
+                    </div>
+
+                    <!-- M2 -->
+                    <div class="bg-white p-5 rounded-xl border-l-4 border-green-500 shadow-sm hover:shadow-md transition-shadow card-hover">
+                        <div class="flex justify-between items-start mb-3">
+                            <span class="text-xs font-bold text-green-500 uppercase">Módulo 2: Datos</span>
+                            <i class="fa-solid fa-database text-slate-300"></i>
+                        </div>
+                        <h3 class="font-bold text-slate-800 mb-2">Almacenamiento de Fotos</h3>
+                        <p class="text-sm text-slate-600">¿Qué tipo de datos son las fotos? ¿Usarían Cloud SQL o Cloud Storage?</p>
+                    </div>
+
+                    <!-- M3 -->
+                    <div class="bg-white p-5 rounded-xl border-l-4 border-indigo-500 shadow-sm hover:shadow-md transition-shadow card-hover">
+                        <div class="flex justify-between items-start mb-3">
+                            <span class="text-xs font-bold text-indigo-500 uppercase">Módulo 3: IA</span>
+                            <i class="fa-solid fa-robot text-slate-300"></i>
+                        </div>
+                        <h3 class="font-bold text-slate-800 mb-2">Análisis de Sentimiento</h3>
+                        <p class="text-sm text-slate-600">Para las reseñas: ¿API pre-entrenada, AutoML o Vertex AI?</p>
+                    </div>
+
+                    <!-- M5 -->
+                    <div class="bg-white p-5 rounded-xl border-l-4 border-red-500 shadow-sm hover:shadow-md transition-shadow card-hover">
+                        <div class="flex justify-between items-start mb-3">
+                            <span class="text-xs font-bold text-red-500 uppercase">Módulo 5: Seguridad</span>
+                            <i class="fa-solid fa-lock text-slate-300"></i>
+                        </div>
+                        <h3 class="font-bold text-slate-800 mb-2">Control de Acceso</h3>
+                        <p class="text-sm text-slate-600">¿Cómo asegurar que solo el usuario edite su perfil? (Principio de Menor Privilegio).</p>
+                    </div>
+
+                    <!-- M6 -->
+                    <div class="bg-white p-5 rounded-xl border-l-4 border-yellow-500 shadow-sm hover:shadow-md transition-shadow card-hover">
+                        <div class="flex justify-between items-start mb-3">
+                            <span class="text-xs font-bold text-yellow-500 uppercase">Módulo 6: Operaciones</span>
+                            <i class="fa-solid fa-chart-line text-slate-300"></i>
+                        </div>
+                        <h3 class="font-bold text-slate-800 mb-2">Control de Costos (FinOps)</h3>
+                        <p class="text-sm text-slate-600">¿Cómo evitar que los costos de IA se disparen? ¿Etiquetas, Presupuestos o Cuotas?</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Instructor Role / Discussion Guide -->
+        <div class="bg-blue-50 rounded-2xl p-8 border border-blue-100">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="bg-blue-600 text-white p-2 rounded-lg">
+                    <i class="fa-solid fa-chalkboard-user"></i>
+                </div>
+                <h3 class="text-xl font-bold text-slate-800">Guía para el Debate y Cierre</h3>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div>
+                    <h4 class="font-semibold text-blue-800 mb-2">Puntos de Discusión</h4>
+                    <ul class="list-disc list-inside text-sm text-slate-600 space-y-2">
+                        <li>Contrastar decisiones (ej. Grupo A eligió VMs vs Grupo B eligió Cloud Run).</li>
+                        <li>Discutir Pros y Contras de Serverless para una Startup.</li>
+                        <li>Validar elección de Cloud Storage para objetos no estructurados (fotos).</li>
+                        <li>Reforzar la conexión: Modernización afecta Costos; Datos alimentan la IA.</li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-semibold text-blue-800 mb-2">Mensaje de Cierre</h4>
+                    <blockquote class="text-sm italic text-slate-600 border-l-4 border-blue-300 pl-4 py-1">
+                        "Hoy demostraron que no solo saben los conceptos, sino que pueden usarlos para construir una solución. Han dejado de ver los árboles para diseñar el bosque."
+                    </blockquote>
+                    <div class="mt-4 flex items-center gap-2 text-sm font-medium text-slate-700">
+                        <i class="fa-solid fa-flag-checkered text-red-500"></i>
+                        <span>Próximo paso: Preparación Examen Final</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Simple Footer -->
+    <footer class="bg-white border-t border-slate-200 py-8 mt-12">
+        <div class="max-w-6xl mx-auto px-4 text-center text-slate-400 text-sm">
+            <p>Planificación Docente CDL • Clase 7</p>
+        </div>
+    </footer>
+
+</body>
+</html>
