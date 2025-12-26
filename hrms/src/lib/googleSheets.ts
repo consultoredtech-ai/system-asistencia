@@ -9,6 +9,11 @@ export interface User {
     Role: 'Admin' | 'Employee';
     Salary?: string;
     PasswordHash: string;
+    BirthDate?: string;
+    Address?: string;
+    Phone?: string;
+    JoinDate?: string;
+    TerminationDate?: string;
 }
 
 export async function getAuth() {
@@ -67,7 +72,7 @@ export async function updateSheetData(range: string, values: any[]) {
 }
 
 export async function getUsers(): Promise<User[]> {
-    const rows = await getSheetData('Users!A2:F');
+    const rows = await getSheetData('Users!A2:M');
     return rows.map((row) => ({
         EmployeeID: row[0],
         Name: row[1],
@@ -75,6 +80,11 @@ export async function getUsers(): Promise<User[]> {
         Role: row[3] as 'Admin' | 'Employee',
         Salary: row[4],
         PasswordHash: row[5],
+        BirthDate: row[8] || '',
+        Address: row[9] || '',
+        Phone: row[10] || '',
+        JoinDate: row[11] || '',
+        TerminationDate: row[12] || '',
     }));
 }
 

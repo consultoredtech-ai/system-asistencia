@@ -23,10 +23,24 @@ export async function GET(req: Request) {
         // 3. Top employees by overtime (mock data for now)
         const overtimeStats = calculateOvertimeStats(attendance);
 
+        // 4. Summary data
+        const totalEmployees = (await getSheetData('Users!A2:A')).length;
+        const totalRequests = requests.length;
+        const pendingRequests = requests.filter(r => r[6] === 'Pending').length;
+
+        const today = new Date().toISOString().split('T')[0];
+        const presentToday = attendance.filter(row => row[1] === today && row[4] === 'Present').length;
+
         return NextResponse.json({
             attendanceTrend,
             requestTypes,
-            overtimeStats
+            overtimeStats,
+            summary: {
+                totalEmployees,
+                totalRequests,
+                pendingRequests,
+                presentToday
+            }
         });
     } catch (error) {
         console.error('Error fetching metrics:', error);

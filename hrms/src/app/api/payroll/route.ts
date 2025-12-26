@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]/route';
 import { getSheetData, appendSheetData, getUsers } from '@/lib/googleSheets';
 import { NextResponse } from 'next/server';
+import { getBusinessDaysInMonth } from '@/lib/holidays';
 
 export async function GET(req: Request) {
     const session = await getServerSession(authOptions);
@@ -73,9 +74,14 @@ export async function POST(req: Request) {
                 date.getFullYear() === parseInt(year);
         });
 
+        // Calculate business days in the month
+        const businessDays = await getBusinessDaysInMonth(parseInt(month), parseInt(year));
+        const workingHoursPerDay = 8; // Standard 8 hours
+        const totalWorkingHours = businessDays * workingHoursPerDay;
+
         // Mock overtime calculation (you can enhance this)
         const overtimeHours = monthAttendance.length * 0.5; // Example: 0.5 hrs overtime per day
-        const hourlyRate = baseSalary / 160; // Assuming 160 hours/month
+        const hourlyRate = baseSalary / totalWorkingHours;
         const overtimePay = overtimeHours * hourlyRate * 1.5; // 1.5x for overtime
 
         // Mock deductions (10% taxes + 5% insurance)

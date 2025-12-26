@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]/route';
 import { appendSheetData, getSheetData, updateSheetData } from '@/lib/googleSheets';
 import { NextResponse } from 'next/server';
+import { isHoliday } from '@/lib/holidays';
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
@@ -64,8 +65,14 @@ export async function POST(req: Request) {
             const diffMinutes = (checkInDate.getTime() - entryDate.getTime()) / 60000;
 
             if (diffMinutes < 0) observation = 'Tiempo a favor';
-            else if (diffMinutes > 0 && diffMinutes <= 60) observation = 'Atraso';
-            else if (diffMinutes > 60) observation = 'Descuento';
+            else if (diffMinutes > 0 && diffMinutes <= 60) {
+                const festive = await isHoliday(now);
+                observation = festive ? 'Feriado (Trabajado)' : 'Atraso';
+            }
+            else if (diffMinutes > 60) {
+                const festive = await isHoliday(now);
+                observation = festive ? 'Feriado (Trabajado)' : 'Descuento';
+            }
         }
 
         await appendSheetData('Attendance!A2:F', [employeeId, dateStr, timeStr, '', 'Present', observation]);

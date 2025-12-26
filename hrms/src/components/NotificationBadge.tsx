@@ -46,20 +46,43 @@ export default function NotificationBadge() {
     }, []);
 
     const markAsRead = async (notificationId: string) => {
+        // Optimistic update
+        setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, isRead: true } : n));
+        setUnreadCount(prev => Math.max(0, prev - 1));
+
         try {
             await fetch('/api/notifications', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ notificationId }),
             });
-            fetchNotifications();
         } catch (err) {
             console.error('Error marking notification as read:', err);
+            fetchNotifications(); // Revert on error
+        }
+    };
+
+    const markAllAsRead = async () => {
+        // Optimistic update
+        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+        setUnreadCount(0);
+
+        try {
+            await fetch('/api/notifications', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ markAll: true }),
+            });
+        } catch (err) {
+            console.error('Error marking all notifications as read:', err);
+            fetchNotifications(); // Revert on error
         }
     };
 
     const handleNotificationClick = (notification: Notification) => {
-        markAsRead(notification.id);
+        if (!notification.isRead) {
+            markAsRead(notification.id);
+        }
         if (notification.link) {
             router.push(notification.link);
         }
@@ -164,7 +187,7 @@ export default function NotificationBadge() {
                         <div className="p-2 border-t border-gray-200">
                             <button
                                 onClick={() => {
-                                    notifications.filter(n => !n.isRead).forEach(n => markAsRead(n.id));
+                                    markAllAsRead();
                                     setShowDropdown(false);
                                 }}
                                 className="w-full text-sm text-blue-600 hover:text-blue-800 font-medium"

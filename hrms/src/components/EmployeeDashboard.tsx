@@ -14,10 +14,14 @@ export default function EmployeeDashboard() {
     const [durationType, setDurationType] = useState<'Full Day' | 'Hourly'>('Full Day');
     const [formErrors, setFormErrors] = useState<Record<string, string>>({});
     const [isDocumentsOpen, setIsDocumentsOpen] = useState(false);
+    const [isRequestsOpen, setIsRequestsOpen] = useState(false);
+    const [isAttendanceOpen, setIsAttendanceOpen] = useState(false);
+    const [attendanceHistory, setAttendanceHistory] = useState<any[]>([]);
 
     useEffect(() => {
         fetchRequests();
         fetchVacation();
+        fetchAttendanceHistory();
     }, []);
 
     const fetchRequests = async () => {
@@ -31,6 +35,20 @@ export default function EmployeeDashboard() {
             setDocuments(docData.documents || []);
         } catch (err) {
             console.error('Error fetching requests:', err);
+        }
+    };
+
+    const fetchAttendanceHistory = async () => {
+        try {
+            const res = await fetch('/api/attendance');
+            const data = await res.json();
+            // Filter for last 7 days
+            const lastWeek = new Date();
+            lastWeek.setDate(lastWeek.getDate() - 7);
+            const filtered = (data.history || []).filter((h: any) => new Date(h.date) >= lastWeek);
+            setAttendanceHistory(filtered);
+        } catch (err) {
+            console.error('Error fetching attendance history:', err);
         }
     };
 
@@ -58,6 +76,7 @@ export default function EmployeeDashboard() {
             });
             const data = await res.json();
             setMessage(data.message || data.error);
+            if (res.ok) fetchAttendanceHistory();
         } catch (err) {
             setMessage('Error submitting attendance');
         }
@@ -162,7 +181,7 @@ export default function EmployeeDashboard() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Attendance Card */}
                 <div className="bg-white p-6 rounded shadow">
-                    <h2 className="text-xl font-semibold mb-4">Asistencia</h2>
+                    <h2 className="text-xl font-semibold mb-4 text-gray-900">Asistencia</h2>
                     <div className="flex gap-4">
                         <button
                             onClick={() => handleAttendance('check-in')}
@@ -182,31 +201,36 @@ export default function EmployeeDashboard() {
                 </div>
 
                 {/* Vacation Balance Card */}
-                <div className="bg-white p-6 rounded shadow">
-                    <h2 className="text-xl font-semibold mb-4">Días de Vacaciones</h2>
-                    <div className="space-y-2">
-                        <div className="flex justify-between">
-                            <span className="text-gray-600">Total:</span>
-                            <span className="font-bold">{vacation.total}</span>
+                <div className="bg-white p-6 rounded shadow border-t-4 border-green-500">
+                    <h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-gray-900">
+                        <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        Vacaciones
+                    </h2>
+                    <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                            <span className="text-gray-700">Total:</span>
+                            <span className="font-bold bg-gray-100 px-2 py-1 rounded text-gray-900">{vacation.total}</span>
                         </div>
-                        <div className="flex justify-between">
-                            <span className="text-gray-600">Usados:</span>
-                            <span className="text-red-600 font-bold">{vacation.used}</span>
+                        <div className="flex justify-between items-center">
+                            <span className="text-gray-700">Usados:</span>
+                            <span className="text-red-600 font-bold bg-red-50 px-2 py-1 rounded">{vacation.used}</span>
                         </div>
-                        <div className="flex justify-between">
-                            <span className="text-gray-600">Pendientes:</span>
-                            <span className="text-yellow-600 font-bold">{vacation.pending}</span>
+                        <div className="flex justify-between items-center">
+                            <span className="text-gray-700">Pendientes:</span>
+                            <span className="text-yellow-600 font-bold bg-yellow-50 px-2 py-1 rounded">{vacation.pending}</span>
                         </div>
-                        <div className="flex justify-between border-t pt-2">
+                        <div className="flex justify-between items-center border-t pt-3">
                             <span className="text-gray-900 font-medium">Disponibles:</span>
-                            <span className="text-green-600 font-bold text-lg">{vacation.available}</span>
+                            <span className="text-green-600 font-bold text-xl">{vacation.available}</span>
                         </div>
                     </div>
                 </div>
 
                 {/* Report Card */}
                 <div className="bg-white p-6 rounded shadow">
-                    <h2 className="text-xl font-semibold mb-4">Reportes</h2>
+                    <h2 className="text-xl font-semibold mb-4 text-gray-900">Reportes</h2>
                     <button
                         onClick={generatePDF}
                         disabled={loading}
@@ -217,13 +241,73 @@ export default function EmployeeDashboard() {
                 </div>
             </div>
 
+            {/* My Attendance - Accordion */}
+            <div className="bg-white rounded shadow">
+                <button
+                    onClick={() => setIsAttendanceOpen(!isAttendanceOpen)}
+                    className="w-full p-6 flex justify-between items-center hover:bg-gray-50 transition"
+                >
+                    <h2 className="text-xl font-semibold text-gray-900">Mi Asistencia (Última Semana)</h2>
+                    <svg
+                        className={`w-6 h-6 transform transition-transform ${isAttendanceOpen ? 'rotate-180' : ''}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
+
+                {isAttendanceOpen && (
+                    <div className="p-6 pt-0 border-t">
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Entrada</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Salida</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Observación</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {attendanceHistory.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={5} className="px-6 py-4 text-center text-gray-500">No hay registros esta semana</td>
+                                        </tr>
+                                    ) : (
+                                        attendanceHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((row: any, idx: number) => (
+                                            <tr key={idx} className="hover:bg-gray-50 transition">
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.date}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{row.checkIn || '--:--'}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{row.checkOut || '--:--'}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${row.status === 'Present' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                                        }`}>
+                                                        {row.status === 'Present' ? 'Presente' : row.status}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">
+                                                    {row.observation}
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+            </div>
+
             {/* My Documents - Accordion */}
             <div className="bg-white rounded shadow">
                 <button
                     onClick={() => setIsDocumentsOpen(!isDocumentsOpen)}
                     className="w-full p-6 flex justify-between items-center hover:bg-gray-50 transition"
                 >
-                    <h2 className="text-xl font-semibold">Mis Documentos</h2>
+                    <h2 className="text-xl font-semibold text-gray-900">Mis Documentos</h2>
                     <svg
                         className={`w-6 h-6 transform transition-transform ${isDocumentsOpen ? 'rotate-180' : ''}`}
                         fill="none"
@@ -265,7 +349,7 @@ export default function EmployeeDashboard() {
 
             {/* Request Form */}
             <div className="bg-white p-6 rounded shadow">
-                <h2 className="text-xl font-semibold mb-4">Solicitar Permiso</h2>
+                <h2 className="text-xl font-semibold mb-4 text-gray-900">Solicitar Permiso</h2>
                 <form onSubmit={async (e) => {
                     e.preventDefault();
                     const form = e.target as HTMLFormElement;
@@ -298,7 +382,7 @@ export default function EmployeeDashboard() {
                 }}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div>
-                            <label className="block text-sm font-medium mb-1">Tipo</label>
+                            <label className="block text-sm font-medium mb-1 text-gray-700">Tipo</label>
                             <select name="type" className="w-full p-2 border rounded">
                                 <option value="Vacation">Vacaciones</option>
                                 <option value="Sick Leave">Licencia Médica</option>
@@ -306,12 +390,12 @@ export default function EmployeeDashboard() {
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium mb-1">Motivo</label>
+                            <label className="block text-sm font-medium mb-1 text-gray-700">Motivo</label>
                             <input name="reason" type="text" className="w-full p-2 border rounded" required />
                         </div>
 
                         <div className="md:col-span-2">
-                            <label className="block text-sm font-medium mb-1">Duración</label>
+                            <label className="block text-sm font-medium mb-1 text-gray-700">Duración</label>
                             <div className="flex gap-4">
                                 <label className="inline-flex items-center">
                                     <input
@@ -341,27 +425,27 @@ export default function EmployeeDashboard() {
                         {durationType === 'Full Day' ? (
                             <>
                                 <div>
-                                    <label className="block text-sm font-medium mb-1">Fecha Inicio</label>
+                                    <label className="block text-sm font-medium mb-1 text-gray-700">Fecha Inicio</label>
                                     <input name="startDate" type="date" className="w-full p-2 border rounded" required />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium mb-1">Fecha Fin</label>
+                                    <label className="block text-sm font-medium mb-1 text-gray-700">Fecha Fin</label>
                                     <input name="endDate" type="date" className="w-full p-2 border rounded" required />
                                 </div>
                             </>
                         ) : (
                             <>
                                 <div>
-                                    <label className="block text-sm font-medium mb-1">Fecha</label>
+                                    <label className="block text-sm font-medium mb-1 text-gray-700">Fecha</label>
                                     <input name="startDate" type="date" className="w-full p-2 border rounded" required />
                                 </div>
                                 <div className="grid grid-cols-2 gap-2">
                                     <div>
-                                        <label className="block text-sm font-medium mb-1">Hora Inicio</label>
+                                        <label className="block text-sm font-medium mb-1 text-gray-700">Hora Inicio</label>
                                         <input name="startTime" type="time" className="w-full p-2 border rounded" required />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium mb-1">Hora Fin</label>
+                                        <label className="block text-sm font-medium mb-1 text-gray-700">Hora Fin</label>
                                         <input name="endTime" type="time" className="w-full p-2 border rounded" required />
                                     </div>
                                 </div>
@@ -388,46 +472,64 @@ export default function EmployeeDashboard() {
                 </form>
             </div>
 
-            {/* Request History */}
-            <div className="bg-white p-6 rounded shadow">
-                <h2 className="text-xl font-semibold mb-4">Historial de Solicitudes</h2>
-                <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fechas</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Motivo</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {requests.length === 0 ? (
-                                <tr>
-                                    <td colSpan={4} className="px-6 py-4 text-center text-gray-500">No hay solicitudes</td>
-                                </tr>
-                            ) : (
-                                requests.map((req: any) => (
-                                    <tr key={req.id}>
-                                        <td className="px-6 py-4 whitespace-nowrap">{req.type}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            {req.startDate} {req.startTime ? `(${req.startTime} - ${req.endTime})` : `al ${req.endDate}`}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">{req.reason}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${req.status === 'Approved' ? 'bg-green-100 text-green-800' :
-                                                req.status === 'Rejected' ? 'bg-red-100 text-red-800' :
-                                                    'bg-yellow-100 text-yellow-800'
-                                                }`}>
-                                                {req.status === 'Approved' ? 'Aprobado' : req.status === 'Rejected' ? 'Rechazado' : 'Pendiente'}
-                                            </span>
-                                        </td>
+            {/* Request History - Accordion */}
+            <div className="bg-white rounded shadow">
+                <button
+                    onClick={() => setIsRequestsOpen(!isRequestsOpen)}
+                    className="w-full p-6 flex justify-between items-center hover:bg-gray-50 transition"
+                >
+                    <h2 className="text-xl font-semibold text-gray-900">Historial de Solicitudes</h2>
+                    <svg
+                        className={`w-6 h-6 transform transition-transform ${isRequestsOpen ? 'rotate-180' : ''}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
+
+                {isRequestsOpen && (
+                    <div className="p-6 pt-0 border-t">
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fechas</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Motivo</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
                                     </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {requests.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={4} className="px-6 py-4 text-center text-gray-500">No hay solicitudes</td>
+                                        </tr>
+                                    ) : (
+                                        requests.map((req: any) => (
+                                            <tr key={req.id}>
+                                                <td className="px-6 py-4 whitespace-nowrap">{req.type}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    {req.startDate} {req.startTime ? `(${req.startTime} - ${req.endTime})` : `al ${req.endDate}`}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">{req.reason}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${req.status === 'Approved' ? 'bg-green-100 text-green-800' :
+                                                        req.status === 'Rejected' ? 'bg-red-100 text-red-800' :
+                                                            'bg-yellow-100 text-yellow-800'
+                                                        }`}>
+                                                        {req.status === 'Approved' ? 'Aprobado' : req.status === 'Rejected' ? 'Rechazado' : 'Pendiente'}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

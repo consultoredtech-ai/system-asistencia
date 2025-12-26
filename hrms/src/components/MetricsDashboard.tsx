@@ -31,7 +31,11 @@ ChartJS.register(
 export default function MetricsDashboard() {
     const [metrics, setMetrics] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const [isOpen, setIsOpen] = useState(false);
+    const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+        attendance: true,
+        requests: false,
+        employees: false
+    });
 
     useEffect(() => {
         fetchMetrics();
@@ -56,8 +60,12 @@ export default function MetricsDashboard() {
         }
     };
 
+    const toggleSection = (section: string) => {
+        setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
+    };
+
     if (loading) {
-        return <div className="p-6 text-center">Cargando métricas...</div>;
+        return <div className="p-6 text-center text-gray-600">Cargando métricas...</div>;
     }
 
     if (!metrics) {
@@ -115,108 +123,105 @@ export default function MetricsDashboard() {
     };
 
     return (
-        <div className="bg-white rounded shadow">
-            <button
-                onClick={() => setIsOpen(!isOpen)}
-                className="w-full p-6 flex justify-between items-center hover:bg-gray-50 transition"
-            >
-                <h2 className="text-xl font-semibold">Dashboard de Métricas</h2>
-                <svg
-                    className={`w-6 h-6 transform transition-transform ${isOpen ? 'rotate-180' : ''}`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-            </button>
-
-            {isOpen && (
-                <div className="p-6 pt-0 border-t">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        {/* Attendance Trend */}
-                        <div className="bg-gray-50 p-4 rounded-lg border">
-                            <h3 className="text-sm font-semibold mb-3">Tendencia de Asistencia (Últimos 6 Meses)</h3>
-                            <div className="h-48">
-                                <Line
-                                    data={attendanceData}
-                                    options={{
-                                        responsive: true,
-                                        maintainAspectRatio: false,
-                                        plugins: {
-                                            legend: {
-                                                position: 'top' as const,
-                                                labels: {
-                                                    font: { size: 10 }
-                                                }
-                                            },
-                                        },
-                                        scales: {
-                                            y: {
-                                                beginAtZero: true,
-                                                ticks: { font: { size: 10 } }
-                                            },
-                                            x: {
-                                                ticks: { font: { size: 10 } }
-                                            }
-                                        },
-                                    }}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Request Types */}
-                        <div className="bg-gray-50 p-4 rounded-lg border">
-                            <h3 className="text-sm font-semibold mb-3">Distribución de Tipos de Solicitudes</h3>
-                            <div className="h-48">
-                                <Pie
-                                    data={requestTypesData}
-                                    options={{
-                                        responsive: true,
-                                        maintainAspectRatio: false,
-                                        plugins: {
-                                            legend: {
-                                                position: 'right' as const,
-                                                labels: {
-                                                    font: { size: 10 }
-                                                }
-                                            },
-                                        },
-                                    }}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Top Employees */}
-                        <div className="bg-gray-50 p-4 rounded-lg border lg:col-span-2">
-                            <h3 className="text-sm font-semibold mb-3">Top 5 Empleados por Días Trabajados</h3>
-                            <div className="h-48">
-                                <Bar
-                                    data={overtimeData}
-                                    options={{
-                                        responsive: true,
-                                        maintainAspectRatio: false,
-                                        plugins: {
-                                            legend: {
-                                                display: false,
-                                            },
-                                        },
-                                        scales: {
-                                            y: {
-                                                beginAtZero: true,
-                                                ticks: { font: { size: 10 } }
-                                            },
-                                            x: {
-                                                ticks: { font: { size: 10 } }
-                                            }
-                                        },
-                                    }}
-                                />
-                            </div>
-                        </div>
-                    </div>
+        <div className="space-y-6">
+            {/* Summary Section */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-white p-4 rounded shadow border-l-4 border-blue-500">
+                    <p className="text-sm text-gray-600 uppercase font-bold">Total Empleados</p>
+                    <p className="text-2xl font-bold text-gray-900">{metrics.summary?.totalEmployees || 0}</p>
                 </div>
-            )}
+                <div className="bg-white p-4 rounded shadow border-l-4 border-green-500">
+                    <p className="text-sm text-gray-600 uppercase font-bold">Presentes Hoy</p>
+                    <p className="text-2xl font-bold text-gray-900">{metrics.summary?.presentToday || 0}</p>
+                </div>
+                <div className="bg-white p-4 rounded shadow border-l-4 border-yellow-500">
+                    <p className="text-sm text-gray-600 uppercase font-bold">Solicitudes Pendientes</p>
+                    <p className="text-2xl font-bold text-gray-900">{metrics.summary?.pendingRequests || 0}</p>
+                </div>
+                <div className="bg-white p-4 rounded shadow border-l-4 border-purple-500">
+                    <p className="text-sm text-gray-600 uppercase font-bold">Total Solicitudes</p>
+                    <p className="text-2xl font-bold text-gray-900">{metrics.summary?.totalRequests || 0}</p>
+                </div>
+            </div>
+
+            {/* Attendance Trend Accordion */}
+            <div className="bg-white rounded shadow overflow-hidden">
+                <button
+                    onClick={() => toggleSection('attendance')}
+                    className="w-full p-4 flex justify-between items-center hover:bg-gray-50 transition border-b"
+                >
+                    <h3 className="text-lg font-semibold text-gray-900">Tendencia de Asistencia (Últimos 6 Meses)</h3>
+                    <svg className={`w-5 h-5 transform transition-transform ${openSections.attendance ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
+                {openSections.attendance && (
+                    <div className="p-4 h-64">
+                        <Line
+                            data={attendanceData}
+                            options={{
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: { legend: { position: 'top' as const } },
+                                scales: { y: { beginAtZero: true } }
+                            }}
+                        />
+                    </div>
+                )}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Request Types Accordion */}
+                <div className="bg-white rounded shadow overflow-hidden">
+                    <button
+                        onClick={() => toggleSection('requests')}
+                        className="w-full p-4 flex justify-between items-center hover:bg-gray-50 transition border-b"
+                    >
+                        <h3 className="text-lg font-semibold text-gray-900">Distribución de Solicitudes</h3>
+                        <svg className={`w-5 h-5 transform transition-transform ${openSections.requests ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    {openSections.requests && (
+                        <div className="p-4 h-64">
+                            <Pie
+                                data={requestTypesData}
+                                options={{
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: { legend: { position: 'right' as const } }
+                                }}
+                            />
+                        </div>
+                    )}
+                </div>
+
+                {/* Top Employees Accordion */}
+                <div className="bg-white rounded shadow overflow-hidden">
+                    <button
+                        onClick={() => toggleSection('employees')}
+                        className="w-full p-4 flex justify-between items-center hover:bg-gray-50 transition border-b"
+                    >
+                        <h3 className="text-lg font-semibold text-gray-900">Top 5 Empleados (Días Trabajados)</h3>
+                        <svg className={`w-5 h-5 transform transition-transform ${openSections.employees ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    {openSections.employees && (
+                        <div className="p-4 h-64">
+                            <Bar
+                                data={overtimeData}
+                                options={{
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: { legend: { display: false } },
+                                    scales: { y: { beginAtZero: true } }
+                                }}
+                            />
+                        </div>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }

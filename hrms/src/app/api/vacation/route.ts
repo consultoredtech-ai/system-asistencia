@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]/route';
 import { getSheetData, getUsers } from '@/lib/googleSheets';
 import { NextResponse } from 'next/server';
+import { getChileanHolidays } from '@/lib/holidays';
 
 export async function GET(req: Request) {
     const session = await getServerSession(authOptions);
@@ -31,12 +32,30 @@ export async function GET(req: Request) {
     );
 
     // Calculate pending days
+    const holidays = await getChileanHolidays(new Date().getFullYear());
+    const holidayDates = new Set(holidays.map(h => h.fecha));
+
     let pendingDays = 0;
     for (const req of userRequests) {
         const start = new Date(req[3]);
         const end = new Date(req[4]);
-        const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-        pendingDays += days;
+
+        // Iterate through each day of the request
+        let current = new Date(start);
+        while (current <= end) {
+            const dateStr = current.toISOString().split('T')[0];
+            const dayOfWeek = current.getDay();
+
+            // Exclude weekends and holidays
+            const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+            const isFestive = holidayDates.has(dateStr);
+
+            if (!isWeekend && !isFestive) {
+                pendingDays++;
+            }
+
+            current.setDate(current.getDate() + 1);
+        }
     }
 
     const availableDays = totalDays - usedDays - pendingDays;
