@@ -10,10 +10,26 @@ export async function POST(req: Request) {
 
     const { action } = await req.json(); // 'check-in' or 'check-out'
     const employeeId = (session.user as any).id;
+
+    // Normalize to Chile timezone
     const now = new Date();
-    const dateStr = now.toISOString().split('T')[0];
-    const timeStr = now.toLocaleTimeString('en-GB', { hour12: false }); // HH:MM:SS
-    const dayOfWeek = now.toLocaleDateString('en-US', { weekday: 'long' }); // "Monday", "Tuesday"...
+    const chileTime = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Santiago',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+        weekday: 'long'
+    }).formatToParts(now);
+
+    const getValue = (type: string) => chileTime.find(p => p.type === type)?.value;
+
+    const dateStr = `${getValue('year')}-${getValue('month')}-${getValue('day')}`;
+    const timeStr = `${getValue('hour')}:${getValue('minute')}:${getValue('second')}`;
+    const dayOfWeek = getValue('weekday');
 
     // Fetch user schedule from Schedules sheet
     const schedules = await getSheetData('Schedules!A2:F');
@@ -27,7 +43,7 @@ export async function POST(req: Request) {
     const s2End = dailySchedule ? dailySchedule[5] : null;
 
     if (action === 'check-in') {
-        const rows = await getSheetData('Attendance!A2:F');
+        const rows = await getSheetData('Attendance!A2:G');
 
         // Find the LAST record for today
         const todayRecords = rows.filter(row => row[0] === employeeId && row[1] === dateStr);
@@ -38,6 +54,7 @@ export async function POST(req: Request) {
         }
 
         let observation = '';
+        let balance = 0;
         let targetEntry = null;
 
         // Determine which shift we are targeting
@@ -62,7 +79,9 @@ export async function POST(req: Request) {
         if (targetEntry) {
             const checkInDate = new Date(`${dateStr}T${timeStr}`);
             const entryDate = new Date(`${dateStr}T${targetEntry}:00`);
-            const diffMinutes = (checkInDate.getTime() - entryDate.getTime()) / 60000;
+            const diffMinutes = Math.round((checkInDate.getTime() - entryDate.getTime()) / 60000);
+
+            balance = -diffMinutes; // Early = positive, Late = negative
 
             if (diffMinutes < 0) observation = 'Tiempo a favor';
             else if (diffMinutes > 0 && diffMinutes <= 60) {
@@ -75,11 +94,11 @@ export async function POST(req: Request) {
             }
         }
 
-        await appendSheetData('Attendance!A2:F', [employeeId, dateStr, timeStr, '', 'Present', observation]);
+        await appendSheetData('Attendance!A2:G', [employeeId, dateStr, timeStr, '', 'Present', observation, balance]);
         return NextResponse.json({ success: true, message: 'Checked in' });
 
     } else if (action === 'check-out') {
-        const rows = await getSheetData('Attendance!A2:F');
+        const rows = await getSheetData('Attendance!A2:G');
         // Find the last record that has NO checkout
         const rowIndex = rows.findIndex(row => row[0] === employeeId && row[1] === dateStr && !row[3]);
 
@@ -88,6 +107,7 @@ export async function POST(req: Request) {
         }
 
         let observation = rows[rowIndex][5] || '';
+        let balance = parseInt(rows[rowIndex][6] || '0');
         let targetExit = null;
 
         // Determine which shift we are ending
@@ -110,7 +130,9 @@ export async function POST(req: Request) {
         if (targetExit) {
             const checkOutDate = new Date(`${dateStr}T${timeStr}`);
             const exitDate = new Date(`${dateStr}T${targetExit}:00`);
-            const diffMinutes = (checkOutDate.getTime() - exitDate.getTime()) / 60000;
+            const diffMinutes = Math.round((checkOutDate.getTime() - exitDate.getTime()) / 60000);
+
+            balance += diffMinutes; // Late exit = positive, Early exit = negative
 
             let outObs = '';
             if (diffMinutes < 0) outObs = 'Falta cumplir horario';
@@ -121,20 +143,52 @@ export async function POST(req: Request) {
         }
 
         const sheetRow = rowIndex + 2;
-        await updateSheetData(`Attendance!D${sheetRow}:F${sheetRow}`, [timeStr, 'Present', observation]);
+        await updateSheetData(`Attendance!D${sheetRow}:G${sheetRow}`, [timeStr, 'Present', observation, balance]);
         return NextResponse.json({ success: true, message: 'Checked out' });
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
 }
 
+export async function PUT(req: Request) {
+    const session = await getServerSession(authOptions);
+    if (!session || (session.user as any).role !== 'Admin') {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { employeeId, date, observation, balance } = await req.json();
+    if (!employeeId || !date) {
+        return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    const rows = await getSheetData('Attendance!A2:G');
+    // Find the row to update. Note: There could be multiple records for one user on one day.
+    // We'll update the last one for that day as it's usually the most relevant.
+    const rowIndex = rows.findLastIndex(row => row[0] === employeeId && row[1] === date);
+
+    if (rowIndex === -1) {
+        return NextResponse.json({ error: 'Record not found' }, { status: 404 });
+    }
+
+    const sheetRow = rowIndex + 2;
+    // Update observation (F) and balance (G)
+    await updateSheetData(`Attendance!F${sheetRow}:G${sheetRow}`, [observation, balance]);
+
+    return NextResponse.json({ success: true, message: 'Record updated' });
+}
+
 export async function GET(req: Request) {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    const { searchParams } = new URL(req.url);
+    const filterEmployeeId = searchParams.get('employeeId');
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
+
     const employeeId = (session.user as any).id;
     const isAdmin = (session.user as any).role === 'Admin';
-    const rows = await getSheetData('Attendance!A2:F');
+    const rows = await getSheetData('Attendance!A2:G');
 
     // Optimization: Fetch users only if Admin to map names
     let userMap = new Map();
@@ -150,12 +204,24 @@ export async function GET(req: Request) {
         checkIn: row[2],
         checkOut: row[3],
         status: row[4],
-        observation: row[5]
+        observation: row[5],
+        balance: row[6] || '0'
     }));
 
     // Filter by employee ID if not Admin
     if (!isAdmin) {
         history = history.filter(row => row.employeeId === employeeId);
+    } else {
+        // Admin filters
+        if (filterEmployeeId && filterEmployeeId !== 'all') {
+            history = history.filter(row => row.employeeId === filterEmployeeId);
+        }
+        if (startDate) {
+            history = history.filter(row => row.date >= startDate);
+        }
+        if (endDate) {
+            history = history.filter(row => row.date <= endDate);
+        }
     }
 
     return NextResponse.json({ history });

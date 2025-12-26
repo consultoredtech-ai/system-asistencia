@@ -13,10 +13,25 @@ export async function GET(req: Request) {
     }
 
     try {
+        // Normalize to Chile timezone
         const now = new Date();
-        const dayOfWeek = now.toLocaleDateString('en-US', { weekday: 'long' });
-        const dateStr = now.toISOString().split('T')[0];
-        const currentTimeStr = now.toLocaleTimeString('en-GB', { hour12: false }).substring(0, 5); // HH:MM
+        const chileTime = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/Santiago',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false,
+            weekday: 'long'
+        }).formatToParts(now);
+
+        const getValue = (type: string) => chileTime.find(p => p.type === type)?.value;
+
+        const dayOfWeek = getValue('weekday');
+        const dateStr = `${getValue('year')}-${getValue('month')}-${getValue('day')}`;
+        const currentTimeStr = `${getValue('hour')}:${getValue('minute')}`;
 
         const users = await getUsers();
         const schedules = await getSheetData('Schedules!A2:F');
