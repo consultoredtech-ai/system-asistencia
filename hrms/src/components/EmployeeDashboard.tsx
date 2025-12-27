@@ -19,11 +19,67 @@ export default function EmployeeDashboard() {
     const [attendanceHistory, setAttendanceHistory] = useState<any[]>([]);
     const [showAuthModal, setShowAuthModal] = useState(false);
 
+    const [payrolls, setPayrolls] = useState<any[]>([]);
+    const [settings, setSettings] = useState<any>({});
+    const [userDetails, setUserDetails] = useState<any>(null);
+    const [viewSlip, setViewSlip] = useState<any | null>(null);
+
+    // Filter States
+    const [selectedCategory, setSelectedCategory] = useState('Todos');
+    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+    const [selectedMonth, setSelectedMonth] = useState((new Date().getMonth() + 1).toString());
+
     useEffect(() => {
         fetchRequests();
         fetchVacation();
         fetchAttendanceHistory();
+        fetchPayrolls();
+        fetchSettings();
+        fetchUserDetails();
     }, []);
+
+    const fetchPayrolls = async () => {
+        try {
+            const res = await fetch('/api/payroll');
+            const data = await res.json();
+            // Filter only approved payrolls for the employee
+            const approved = (data.payroll || []).filter((p: any) => p.status === 'Approved');
+            setPayrolls(approved);
+        } catch (err) {
+            console.error('Error fetching payrolls:', err);
+        }
+    };
+
+    const fetchSettings = async () => {
+        try {
+            const res = await fetch('/api/settings');
+            const data = await res.json();
+            setSettings(data.settings || {});
+        } catch (err) {
+            console.error('Error fetching settings:', err);
+        }
+    };
+
+    const fetchUserDetails = async () => {
+        try {
+            const res = await fetch('/api/user/report-data');
+            const data = await res.json();
+            setUserDetails(data.user);
+        } catch (err) {
+            console.error('Error fetching user details:', err);
+        }
+    };
+
+    const handlePrint = () => {
+        const printContent = document.getElementById('printable-slip');
+        if (!printContent) return;
+
+        const originalContents = document.body.innerHTML;
+        document.body.innerHTML = printContent.innerHTML;
+        window.print();
+        document.body.innerHTML = originalContents;
+        window.location.reload();
+    };
 
     const fetchRequests = async () => {
         try {
@@ -331,29 +387,115 @@ export default function EmployeeDashboard() {
 
                 {isDocumentsOpen && (
                     <div className="p-6 pt-0 border-t">
-                        {documents.length === 0 ? (
-                            <p className="text-gray-500">No tienes documentos disponibles.</p>
-                        ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {documents.map((doc) => (
-                                    <div key={doc.id} className="border p-4 rounded hover:shadow-md transition">
-                                        <h3 className="font-medium text-gray-900 truncate" title={doc.fileName}>{doc.fileName}</h3>
-                                        <p className="text-sm text-gray-500 mb-2">{doc.type} • {doc.uploadDate}</p>
-                                        <a
-                                            href={doc.fileLink}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1"
-                                        >
-                                            <span>Abrir Documento</span>
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                            </svg>
-                                        </a>
-                                    </div>
-                                ))}
+                        {/* Filters */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                            <div>
+                                <label className="block text-xs font-medium mb-1 text-gray-700">Categoría</label>
+                                <select
+                                    className="w-full p-2 border rounded text-sm"
+                                    value={selectedCategory}
+                                    onChange={(e) => setSelectedCategory(e.target.value)}
+                                >
+                                    <option value="Todos">Todos</option>
+                                    <option value="Liquidaciones">Liquidaciones</option>
+                                    <option value="Contratos">Contratos</option>
+                                    <option value="Licencias Médicas">Licencias Médicas</option>
+                                    <option value="Previsión">Previsión</option>
+                                    <option value="Otros">Otros</option>
+                                </select>
                             </div>
-                        )}
+                            <div>
+                                <label className="block text-xs font-medium mb-1 text-gray-700">Año</label>
+                                <select
+                                    className="w-full p-2 border rounded text-sm"
+                                    value={selectedYear}
+                                    onChange={(e) => setSelectedYear(e.target.value)}
+                                >
+                                    <option value="">Todos</option>
+                                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                                        <option key={y} value={y}>{y}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium mb-1 text-gray-700">Mes</label>
+                                <select
+                                    className="w-full p-2 border rounded text-sm"
+                                    value={selectedMonth}
+                                    onChange={(e) => setSelectedMonth(e.target.value)}
+                                >
+                                    <option value="">Todos</option>
+                                    {Array.from({ length: 12 }, (_, i) => (
+                                        <option key={i + 1} value={i + 1}>
+                                            {new Date(2000, i).toLocaleString('es-ES', { month: 'long' })}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        {(() => {
+                            // Filtering Logic
+                            const filteredPayrolls = payrolls.filter(p => {
+                                if (selectedCategory !== 'Todos' && selectedCategory !== 'Liquidaciones') return false;
+                                if (selectedYear && p.year !== selectedYear) return false;
+                                if (selectedMonth && p.month !== selectedMonth) return false;
+                                return true;
+                            });
+
+                            const filteredDocuments = documents.filter(d => {
+                                if (selectedCategory !== 'Todos' && selectedCategory !== 'Liquidaciones' && d.type !== selectedCategory) return false;
+                                // If category is Liquidaciones, we don't show generic docs unless they are typed as such (unlikely with current setup)
+                                if (selectedCategory === 'Liquidaciones') return false;
+
+                                const docDate = new Date(d.uploadDate);
+                                if (selectedYear && docDate.getFullYear().toString() !== selectedYear) return false;
+                                if (selectedMonth && (docDate.getMonth() + 1).toString() !== selectedMonth) return false;
+                                return true;
+                            });
+
+                            if (filteredDocuments.length === 0 && filteredPayrolls.length === 0) {
+                                return <p className="text-gray-500">No se encontraron documentos con los filtros seleccionados.</p>;
+                            }
+
+                            return (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {filteredPayrolls.map((payroll) => (
+                                        <div key={payroll.id} className="border p-4 rounded hover:shadow-md transition bg-blue-50">
+                                            <h3 className="font-medium text-gray-900 truncate">Liquidación {new Date(2000, parseInt(payroll.month) - 1).toLocaleString('es-ES', { month: 'long' })} {payroll.year}</h3>
+                                            <p className="text-sm text-gray-500 mb-2">Nómina • {payroll.status === 'Approved' ? 'Aprobado' : payroll.status}</p>
+                                            <button
+                                                onClick={() => setViewSlip(payroll)}
+                                                className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1"
+                                            >
+                                                <span>Ver Liquidación</span>
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {filteredDocuments.map((doc) => (
+                                        <div key={doc.id} className="border p-4 rounded hover:shadow-md transition">
+                                            <h3 className="font-medium text-gray-900 truncate" title={doc.fileName}>{doc.fileName}</h3>
+                                            <p className="text-sm text-gray-500 mb-2">{doc.type} • {doc.uploadDate}</p>
+                                            <a
+                                                href={doc.fileLink}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1"
+                                            >
+                                                <span>Abrir Documento</span>
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                                </svg>
+                                            </a>
+                                        </div>
+                                    ))}
+                                </div>
+                            );
+                        })()}
                     </div>
                 )}
             </div>
@@ -564,6 +706,186 @@ export default function EmployeeDashboard() {
                             >
                                 Sí, es autorizado
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Modal Liquidación */}
+            {viewSlip && userDetails && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+                        <div className="p-4 border-b flex justify-between items-center no-print">
+                            <h3 className="text-lg font-bold">Vista Previa</h3>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={handlePrint}
+                                    className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+                                >
+                                    Imprimir
+                                </button>
+                                <button onClick={() => setViewSlip(null)} className="text-gray-500 hover:text-gray-700">
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="printable-slip" className="p-8 bg-white text-sm font-sans">
+                            <div className="text-center mb-4 underline font-bold text-lg">
+                                LIQUIDACION DE REMUNERACIONES
+                            </div>
+
+                            {/* Header Company Info */}
+                            <div className="mb-6 text-xs">
+                                <p className="font-bold">{settings.CompanyName || 'NOMBRE EMPRESA'}</p>
+                                <p>RUT: {settings.CompanyRUT || 'XX.XXX.XXX-X'}</p>
+                                <p>{settings.CompanyAddress || 'Dirección Empresa'}</p>
+                            </div>
+
+                            {/* Employee Info Box */}
+                            <div className="border border-black mb-4">
+                                <div className="border-b border-black p-1 bg-gray-100 font-bold text-xs">
+                                    DATOS DEL TRABAJADOR
+                                </div>
+                                <div className="p-2 grid grid-cols-2 gap-4 text-xs">
+                                    <div>
+                                        <p><strong>NOMBRE:</strong> {userDetails.name}</p>
+                                        <p><strong>RUT:</strong> {userDetails.employeeId}</p>
+                                    </div>
+                                    <div>
+                                        <p><strong>Fecha ingreso:</strong> {userDetails.joinDate || '-'}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Period Info Box */}
+                            <div className="border border-black mb-4 text-xs">
+                                <div className="grid grid-cols-2 divide-x divide-black">
+                                    <div className="p-1">
+                                        <strong>Período de Remuneración:</strong> {new Date(2000, parseInt(viewSlip.month) - 1).toLocaleString('es-ES', { month: 'long' }).toUpperCase()} {viewSlip.year}
+                                    </div>
+                                    <div className="p-1">
+                                        <strong>Días trabajados:</strong> 30 días
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="mb-1 font-bold text-xs underline">DETALLE DE REMUNERACIÓN</div>
+
+                            {/* Detail Table */}
+                            <div className="border border-black text-xs">
+                                {/* Header */}
+                                <div className="grid grid-cols-[1fr_100px_100px] bg-cyan-500 text-white font-bold border-b border-black text-center">
+                                    <div className="p-1 text-left pl-2">Haberes del Trabajador</div>
+                                    <div className="p-1"></div>
+                                    <div className="p-1">Valor</div>
+                                </div>
+
+                                {/* Body */}
+                                <div className="divide-y divide-transparent">
+                                    <div className="grid grid-cols-[1fr_100px_100px] p-1">
+                                        <div>Sueldo Base</div>
+                                        <div className="text-right">{viewSlip.baseSalary.toLocaleString()} $</div>
+                                        <div className="text-right">{viewSlip.baseSalary.toLocaleString()}</div>
+                                    </div>
+                                    <div className="grid grid-cols-[1fr_100px_100px] p-1">
+                                        <div>Gratificacion con tope</div>
+                                        <div className="text-right">25% $</div>
+                                        <div className="text-right">{viewSlip.gratification.toLocaleString()}</div>
+                                    </div>
+                                    <div className="grid grid-cols-[1fr_100px_100px] p-1 font-bold">
+                                        <div>Total Remuneración Imponible</div>
+                                        <div></div>
+                                        <div className="text-right">{viewSlip.taxableIncome.toLocaleString()}</div>
+                                    </div>
+                                    <div className="grid grid-cols-[1fr_100px_100px] p-1 mt-2">
+                                        <div>Colacion</div>
+                                        <div className="text-right">$</div>
+                                        <div className="text-right">{(viewSlip.nonTaxableIncome / 2).toLocaleString()}</div>
+                                    </div>
+                                    <div className="grid grid-cols-[1fr_100px_100px] p-1">
+                                        <div>Movilizacion</div>
+                                        <div className="text-right">$</div>
+                                        <div className="text-right">{(viewSlip.nonTaxableIncome / 2).toLocaleString()}</div>
+                                    </div>
+                                    <div className="grid grid-cols-[1fr_100px_100px] p-1 font-bold">
+                                        <div>Total Remuneración no Imponible</div>
+                                        <div></div>
+                                        <div className="text-right">{viewSlip.nonTaxableIncome.toLocaleString()}</div>
+                                    </div>
+
+                                    <div className="grid grid-cols-[1fr_100px_100px] bg-blue-200 border-y border-black font-bold p-1">
+                                        <div className="text-right pr-4">Total de Haberes</div>
+                                        <div className="text-right">$</div>
+                                        <div className="text-right">{(viewSlip.taxableIncome + viewSlip.nonTaxableIncome).toLocaleString()}</div>
+                                    </div>
+                                </div>
+
+                                {/* Discounts Header */}
+                                <div className="grid grid-cols-[1fr_100px_100px] bg-cyan-500 text-white font-bold border-b border-black text-center mt-0">
+                                    <div className="p-1 text-left pl-2">Descuentos</div>
+                                    <div className="p-1"></div>
+                                    <div className="p-1">Valor</div>
+                                </div>
+
+                                {/* Discounts Body */}
+                                <div className="divide-y divide-transparent">
+                                    <div className="grid grid-cols-[1fr_100px_100px] p-1">
+                                        <div className="flex justify-between pr-4"><span>Cotización Previsional</span> <span>{userDetails.afp || 'AFP'}</span></div>
+                                        <div className="text-right">11,16% $ (</div>
+                                        <div className="text-right">{viewSlip.afpAmount.toLocaleString()} )</div>
+                                    </div>
+                                    <div className="grid grid-cols-[1fr_100px_100px] p-1">
+                                        <div className="flex justify-between pr-4"><span>Cotización Salud</span> <span>{userDetails.healthSystem || 'FONASA'}</span></div>
+                                        <div className="text-right">7% $ (</div>
+                                        <div className="text-right">{viewSlip.healthAmount.toLocaleString()} )</div>
+                                    </div>
+                                    <div className="grid grid-cols-[1fr_100px_100px] p-1">
+                                        <div>Seguro cesantia</div>
+                                        <div className="text-right">0,6% $ (</div>
+                                        <div className="text-right">{viewSlip.uiAmount.toLocaleString()} )</div>
+                                    </div>
+                                    <div className="grid grid-cols-[1fr_100px_100px] bg-blue-200 border-t border-black font-bold p-1">
+                                        <div className="text-right pr-4">Total Descuentos</div>
+                                        <div className="text-right">$ (</div>
+                                        <div className="text-right">{viewSlip.deductions.toLocaleString()} )</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Net Pay */}
+                            <div className="mt-4 flex flex-col items-end">
+                                <div className="w-1/2">
+                                    <div className="flex justify-between font-bold text-xs mb-1">
+                                        <span>ALCANCE LIQUIDO $</span>
+                                        <span>{viewSlip.netSalary.toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex justify-between font-bold text-xs mb-1">
+                                        <span>Anticipos o Préstamos $ (</span>
+                                        <span> )</span>
+                                    </div>
+                                    <div className="border-2 border-black p-1 flex justify-between font-bold bg-blue-200">
+                                        <span>SALDO LIQUIDO A PAGAR</span>
+                                        <span>$ {viewSlip.netSalary.toLocaleString()}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Footer Text */}
+                            <div className="mt-8 text-xs text-justify">
+                                Certifico que he recibido de mi Empleador <strong>{settings.CompanyName || 'ASESORIAS Y CAPACITACIONES KTALAN SPA'}</strong>, pago a mi total y entera satisfacción el saldo líquido indicado en la presente liquidación, sin tener cargo ni cobro posterior alguno que hacer, por los conceptos de esta liquidación.
+                            </div>
+
+                            <div className="mt-4 text-xs font-bold">
+                                Fecha: 30/{viewSlip.month}/{viewSlip.year}
+                            </div>
+
+                            {/* Signatures */}
+                            <div className="mt-16 flex justify-between text-center text-xs font-bold">
+                                <div className="w-1/3 border-t-2 border-black pt-2">Firma empleador</div>
+                                <div className="w-1/3 border-t-2 border-black pt-2">Firma del Trabajador</div>
+                            </div>
                         </div>
                     </div>
                 </div>

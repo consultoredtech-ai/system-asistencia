@@ -48,8 +48,12 @@ export async function GET(req: Request) {
             name: user.Name,
             email: user.Email,
             role: user.Role,
-            salary: user.Salary, // Only visible to self via this endpoint
+            salary: user.Salary,
             employeeId: user.EmployeeID,
+            afp: user.AFP,
+            healthSystem: user.HealthSystem,
+            joinDate: user.JoinDate,
+            address: user.Address,
         },
         stats: {
             totalPresent,

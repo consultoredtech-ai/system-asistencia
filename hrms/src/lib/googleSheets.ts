@@ -14,6 +14,10 @@ export interface User {
     Phone?: string;
     JoinDate?: string;
     TerminationDate?: string;
+    AFP?: string;
+    HealthSystem?: string;
+    Colacion?: string;
+    Movilizacion?: string;
 }
 
 export async function getAuth() {
@@ -72,7 +76,7 @@ export async function updateSheetData(range: string, values: any[]) {
 }
 
 export async function getUsers(): Promise<User[]> {
-    const rows = await getSheetData('Users!A2:M');
+    const rows = await getSheetData('Users!A2:Q');
     return rows.map((row) => ({
         EmployeeID: row[0],
         Name: row[1],
@@ -85,6 +89,10 @@ export async function getUsers(): Promise<User[]> {
         Phone: row[10] || '',
         JoinDate: row[11] || '',
         TerminationDate: row[12] || '',
+        AFP: row[13] || '',
+        HealthSystem: row[14] || '',
+        Colacion: row[15] || '0',
+        Movilizacion: row[16] || '0',
     }));
 }
 
