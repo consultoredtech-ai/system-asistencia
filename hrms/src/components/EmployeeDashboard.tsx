@@ -17,6 +17,7 @@ export default function EmployeeDashboard() {
     const [isRequestsOpen, setIsRequestsOpen] = useState(false);
     const [isAttendanceOpen, setIsAttendanceOpen] = useState(false);
     const [attendanceHistory, setAttendanceHistory] = useState<any[]>([]);
+    const [showAuthModal, setShowAuthModal] = useState(false);
 
     useEffect(() => {
         fetchRequests();
@@ -66,17 +67,27 @@ export default function EmployeeDashboard() {
         }
     };
 
-    const handleAttendance = async (action: 'check-in' | 'check-out') => {
+    const handleAttendance = async (action: 'check-in' | 'check-out', isAuthorized = false) => {
         setLoading(true);
         try {
             const res = await fetch('/api/attendance', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action }),
+                body: JSON.stringify({ action, isAuthorized }),
             });
             const data = await res.json();
+
+            if (data.error === 'NO_SCHEDULE') {
+                setShowAuthModal(true);
+                setLoading(false);
+                return;
+            }
+
             setMessage(data.message || data.error);
-            if (res.ok) fetchAttendanceHistory();
+            if (res.ok) {
+                fetchAttendanceHistory();
+                setShowAuthModal(false);
+            }
         } catch (err) {
             setMessage('Error submitting attendance');
         }
@@ -531,6 +542,32 @@ export default function EmployeeDashboard() {
                     </div>
                 )}
             </div>
+            {/* Authorization Modal */}
+            {showAuthModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+                        <h3 className="text-xl font-bold text-gray-900 mb-4">Marcaje no programado</h3>
+                        <p className="text-gray-600 mb-6">
+                            No tienes un horario asignado para hoy. ¿Es este un marcaje autorizado?
+                            Si confirmas, se registrará como hora extra pendiente de validación.
+                        </p>
+                        <div className="flex justify-end gap-3">
+                            <button
+                                onClick={() => setShowAuthModal(false)}
+                                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded transition"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={() => handleAttendance('check-in', true)}
+                                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+                            >
+                                Sí, es autorizado
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

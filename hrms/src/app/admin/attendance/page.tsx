@@ -12,6 +12,7 @@ interface AttendanceRecord {
     status: string;
     observation: string;
     balance: string;
+    rowIndex: number;
 }
 
 interface User {
@@ -84,7 +85,8 @@ export default function AdminAttendancePage() {
                     employeeId: editingRecord.employeeId,
                     date: editingRecord.date,
                     observation: newObservation,
-                    balance: newBalance
+                    balance: newBalance,
+                    rowIndex: editingRecord.rowIndex
                 })
             });
 
@@ -285,7 +287,15 @@ export default function AdminAttendancePage() {
                                     {observationOptions.map(opt => (
                                         <button
                                             key={opt}
-                                            onClick={() => setNewObservation(opt)}
+                                            onClick={() => {
+                                                setNewObservation(opt);
+                                                if (opt === "Autorizado por jefatura") {
+                                                    const currentBal = parseInt(newBalance) || 0;
+                                                    if (currentBal < 0) {
+                                                        setNewBalance("0");
+                                                    }
+                                                }
+                                            }}
                                             className={`w-full text-left px-4 py-2 rounded-lg border transition ${newObservation === opt
                                                 ? 'bg-blue-50 border-blue-500 text-blue-700 font-medium'
                                                 : 'border-gray-200 text-gray-700 hover:bg-gray-50'

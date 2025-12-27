@@ -8,7 +8,7 @@ export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { action } = await req.json(); // 'check-in' or 'check-out'
+    const { action, isAuthorized } = await req.json(); // 'check-in' or 'check-out'
     const employeeId = (session.user as any).id;
 
     // Normalize to Chile timezone
@@ -28,7 +28,7 @@ export async function POST(req: Request) {
     const getValue = (type: string) => chileTime.find(p => p.type === type)?.value;
 
     const dateStr = `${getValue('year')}-${getValue('month')}-${getValue('day')}`;
-    const timeStr = `${getValue('hour')}:${getValue('minute')}:${getValue('second')}`;
+    const timeStr = `${getValue('hour')?.padStart(2, '0')}:${getValue('minute')?.padStart(2, '0')}:${getValue('second')?.padStart(2, '0')}`;
     const dayOfWeek = getValue('weekday');
 
     // Fetch user schedule from Schedules sheet
@@ -53,44 +53,56 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Already checked in' }, { status: 400 });
         }
 
+        // Check for schedule
+        if (!dailySchedule && !isAuthorized) {
+            return NextResponse.json({
+                error: 'NO_SCHEDULE',
+                message: 'No tienes un horario asignado para hoy. ¿Es un marcaje autorizado?'
+            }, { status: 400 });
+        }
+
         let observation = '';
         let balance = 0;
         let targetEntry = null;
 
-        // Determine which shift we are targeting
-        const currentMinutes = now.getHours() * 60 + now.getMinutes();
-
-        const getMinutes = (time: string) => {
-            if (!time) return 9999;
-            const [h, m] = time.split(':').map(Number);
-            return h * 60 + m;
-        };
-
-        const s1StartMin = getMinutes(s1Start);
-        const s2StartMin = getMinutes(s2Start);
-
-        // If closer to S2 start than S1 start (and S2 exists), assume S2
-        if (s2Start && Math.abs(currentMinutes - s2StartMin) < Math.abs(currentMinutes - s1StartMin)) {
-            targetEntry = s2Start;
+        if (!dailySchedule && isAuthorized) {
+            observation = 'Hora Extra (Pendiente de Autorización)';
         } else {
-            targetEntry = s1Start;
-        }
+            // Determine which shift we are targeting
+            const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-        if (targetEntry) {
-            const checkInDate = new Date(`${dateStr}T${timeStr}`);
-            const entryDate = new Date(`${dateStr}T${targetEntry}:00`);
-            const diffMinutes = Math.round((checkInDate.getTime() - entryDate.getTime()) / 60000);
+            const getMinutes = (time: string) => {
+                if (!time) return 9999;
+                const [h, m] = time.split(':').map(Number);
+                return h * 60 + m;
+            };
 
-            balance = -diffMinutes; // Early = positive, Late = negative
+            const s1StartMin = getMinutes(s1Start);
+            const s2StartMin = getMinutes(s2Start);
 
-            if (diffMinutes < 0) observation = 'Tiempo a favor';
-            else if (diffMinutes > 0 && diffMinutes <= 60) {
-                const festive = await isHoliday(now);
-                observation = festive ? 'Feriado (Trabajado)' : 'Atraso';
+            // If closer to S2 start than S1 start (and S2 exists), assume S2
+            if (s2Start && Math.abs(currentMinutes - s2StartMin) < Math.abs(currentMinutes - s1StartMin)) {
+                targetEntry = s2Start;
+            } else {
+                targetEntry = s1Start;
             }
-            else if (diffMinutes > 60) {
-                const festive = await isHoliday(now);
-                observation = festive ? 'Feriado (Trabajado)' : 'Descuento';
+
+            if (targetEntry) {
+                const checkInDate = new Date(`${dateStr}T${timeStr}`);
+                const entryDate = new Date(`${dateStr}T${targetEntry}:00`);
+                const diffMinutes = Math.round((checkInDate.getTime() - entryDate.getTime()) / 60000);
+
+                balance = -diffMinutes; // Early = positive, Late = negative
+
+                if (diffMinutes < 0) observation = 'Tiempo a favor';
+                else if (diffMinutes > 0 && diffMinutes <= 60) {
+                    const festive = await isHoliday(now);
+                    observation = festive ? 'Feriado (Trabajado)' : 'Atraso';
+                }
+                else if (diffMinutes > 60) {
+                    const festive = await isHoliday(now);
+                    observation = festive ? 'Feriado (Trabajado)' : 'Descuento';
+                }
             }
         }
 
@@ -110,36 +122,48 @@ export async function POST(req: Request) {
         let balance = parseInt(rows[rowIndex][6] || '0');
         let targetExit = null;
 
-        // Determine which shift we are ending
-        const currentMinutes = now.getHours() * 60 + now.getMinutes();
-        const getMinutes = (time: string) => {
-            if (!time) return -9999;
-            const [h, m] = time.split(':').map(Number);
-            return h * 60 + m;
-        };
-
-        const s1EndMin = getMinutes(s1End);
-        const s2EndMin = getMinutes(s2End);
-
-        if (s2End && Math.abs(currentMinutes - s2EndMin) < Math.abs(currentMinutes - s1EndMin)) {
-            targetExit = s2End;
+        if (!dailySchedule) {
+            // Calculate duration since check-in for overtime
+            const checkInTime = rows[rowIndex][2];
+            const padTime = (t: string) => t.split(':').map(p => p.padStart(2, '0')).join(':');
+            const checkInDate = new Date(`${dateStr}T${padTime(checkInTime)}`);
+            const checkOutDate = new Date(`${dateStr}T${padTime(timeStr)}`);
+            const duration = Math.round((checkOutDate.getTime() - checkInDate.getTime()) / 60000);
+            balance = isNaN(duration) ? 0 : duration;
+            // observation already contains "Hora Extra (Pendiente de Autorización)"
         } else {
-            targetExit = s1End;
-        }
+            // Determine which shift we are ending
+            const currentMinutes = now.getHours() * 60 + now.getMinutes();
+            const getMinutes = (time: string) => {
+                if (!time) return -9999;
+                const [h, m] = time.split(':').map(Number);
+                return h * 60 + m;
+            };
 
-        if (targetExit) {
-            const checkOutDate = new Date(`${dateStr}T${timeStr}`);
-            const exitDate = new Date(`${dateStr}T${targetExit}:00`);
-            const diffMinutes = Math.round((checkOutDate.getTime() - exitDate.getTime()) / 60000);
+            const s1EndMin = getMinutes(s1End);
+            const s2EndMin = getMinutes(s2End);
 
-            balance += diffMinutes; // Late exit = positive, Early exit = negative
+            if (s2End && Math.abs(currentMinutes - s2EndMin) < Math.abs(currentMinutes - s1EndMin)) {
+                targetExit = s2End;
+            } else {
+                targetExit = s1End;
+            }
 
-            let outObs = '';
-            if (diffMinutes < 0) outObs = 'Falta cumplir horario';
-            else if (diffMinutes > 0 && diffMinutes <= 60) outObs = 'Tiempo a favor';
-            else if (diffMinutes > 60) outObs = 'Hora Extra';
+            if (targetExit) {
+                const padTime = (t: string) => t.split(':').map(p => p.padStart(2, '0')).join(':');
+                const checkOutDate = new Date(`${dateStr}T${padTime(timeStr)}`);
+                const exitDate = new Date(`${dateStr}T${targetExit}:00`);
+                const diffMinutes = Math.round((checkOutDate.getTime() - exitDate.getTime()) / 60000);
 
-            if (outObs) observation = observation ? `${observation}, ${outObs}` : outObs;
+                balance += diffMinutes; // Late exit = positive, Early exit = negative
+
+                let outObs = '';
+                if (diffMinutes < 0) outObs = 'Falta cumplir horario';
+                else if (diffMinutes > 0 && diffMinutes <= 60) outObs = 'Tiempo a favor';
+                else if (diffMinutes > 60) outObs = 'Hora Extra';
+
+                if (outObs) observation = observation ? `${observation}, ${outObs}` : outObs;
+            }
         }
 
         const sheetRow = rowIndex + 2;
@@ -156,25 +180,38 @@ export async function PUT(req: Request) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { employeeId, date, observation, balance } = await req.json();
+    const { employeeId, date, observation, balance, rowIndex: providedRowIndex } = await req.json();
+    console.log('PUT /api/attendance', { employeeId, date, observation, balance, providedRowIndex });
+
     if (!employeeId || !date) {
         return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const rows = await getSheetData('Attendance!A2:G');
-    // Find the row to update. Note: There could be multiple records for one user on one day.
-    // We'll update the last one for that day as it's usually the most relevant.
-    const rowIndex = rows.findLastIndex(row => row[0] === employeeId && row[1] === date);
+    let sheetRow;
+    if (providedRowIndex) {
+        sheetRow = providedRowIndex;
+        console.log('Using provided rowIndex:', sheetRow);
+    } else {
+        const rows = await getSheetData('Attendance!A2:G');
+        const rowIndex = rows.findLastIndex(row => row[0] === employeeId && row[1] === date);
+        console.log('Found rowIndex:', rowIndex);
 
-    if (rowIndex === -1) {
-        return NextResponse.json({ error: 'Record not found' }, { status: 404 });
+        if (rowIndex === -1) {
+            return NextResponse.json({ error: 'Record not found' }, { status: 404 });
+        }
+        sheetRow = rowIndex + 2;
     }
 
-    const sheetRow = rowIndex + 2;
-    // Update observation (F) and balance (G)
-    await updateSheetData(`Attendance!F${sheetRow}:G${sheetRow}`, [observation, balance]);
+    console.log('Updating row:', sheetRow);
 
-    return NextResponse.json({ success: true, message: 'Record updated' });
+    try {
+        await updateSheetData(`Attendance!F${sheetRow}:G${sheetRow}`, [observation, balance]);
+        console.log('Update successful');
+        return NextResponse.json({ success: true, message: 'Record updated' });
+    } catch (error) {
+        console.error('Update failed:', error);
+        return NextResponse.json({ error: 'Update failed' }, { status: 500 });
+    }
 }
 
 export async function GET(req: Request) {
@@ -197,7 +234,8 @@ export async function GET(req: Request) {
         users.forEach(u => userMap.set(u[0], u[1]));
     }
 
-    let history = rows.map(row => ({
+    let history = rows.map((row, index) => ({
+        rowIndex: index + 2, // 1-based index + header row
         employeeId: row[0],
         name: isAdmin ? userMap.get(row[0]) || 'Unknown' : undefined,
         date: row[1],
