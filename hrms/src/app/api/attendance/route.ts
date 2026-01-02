@@ -13,7 +13,7 @@ export async function POST(req: Request) {
 
     // Normalize to Chile timezone
     const now = new Date();
-    const chileTime = new Intl.DateTimeFormat('en-US', {
+    const chileTimeParts = new Intl.DateTimeFormat('en-US', {
         timeZone: 'America/Santiago',
         year: 'numeric',
         month: '2-digit',
@@ -25,7 +25,7 @@ export async function POST(req: Request) {
         weekday: 'long'
     }).formatToParts(now);
 
-    const getValue = (type: string) => chileTime.find(p => p.type === type)?.value;
+    const getValue = (type: string) => chileTimeParts.find(p => p.type === type)?.value;
 
     const dateStr = `${getValue('year')}-${getValue('month')}-${getValue('day')}`;
     const timeStr = `${getValue('hour')?.padStart(2, '0')}:${getValue('minute')?.padStart(2, '0')}:${getValue('second')?.padStart(2, '0')}`;
@@ -69,9 +69,9 @@ export async function POST(req: Request) {
             observation = 'Hora Extra (Pendiente de Autorización)';
         } else {
             // Determine which shift we are targeting
-            const currentMinutes = now.getHours() * 60 + now.getMinutes();
+            const currentMinutes = parseInt(getValue('hour') || '0') * 60 + parseInt(getValue('minute') || '0');
 
-            const getMinutes = (time: string) => {
+            const getMinutes = (time: string | null) => {
                 if (!time) return 9999;
                 const [h, m] = time.split(':').map(Number);
                 return h * 60 + m;
@@ -88,9 +88,8 @@ export async function POST(req: Request) {
             }
 
             if (targetEntry) {
-                const checkInDate = new Date(`${dateStr}T${timeStr}`);
-                const entryDate = new Date(`${dateStr}T${targetEntry}:00`);
-                const diffMinutes = Math.round((checkInDate.getTime() - entryDate.getTime()) / 60000);
+                const entryMinutes = getMinutes(targetEntry);
+                const diffMinutes = currentMinutes - entryMinutes;
 
                 balance = -diffMinutes; // Early = positive, Late = negative
 
@@ -112,7 +111,7 @@ export async function POST(req: Request) {
     } else if (action === 'check-out') {
         const rows = await getSheetData('Attendance!A2:G');
         // Find the last record that has NO checkout
-        const rowIndex = rows.findIndex(row => row[0] === employeeId && row[1] === dateStr && !row[3]);
+        const rowIndex = rows.findLastIndex(row => row[0] === employeeId && row[1] === dateStr && !row[3]);
 
         if (rowIndex === -1) {
             return NextResponse.json({ error: 'No active check-in found' }, { status: 400 });
@@ -122,19 +121,19 @@ export async function POST(req: Request) {
         let balance = parseInt(rows[rowIndex][6] || '0');
         let targetExit = null;
 
+        const currentMinutes = parseInt(getValue('hour') || '0') * 60 + parseInt(getValue('minute') || '0');
+
         if (!dailySchedule) {
             // Calculate duration since check-in for overtime
             const checkInTime = rows[rowIndex][2];
-            const padTime = (t: string) => t.split(':').map(p => p.padStart(2, '0')).join(':');
-            const checkInDate = new Date(`${dateStr}T${padTime(checkInTime)}`);
-            const checkOutDate = new Date(`${dateStr}T${padTime(timeStr)}`);
-            const duration = Math.round((checkOutDate.getTime() - checkInDate.getTime()) / 60000);
+            const [ciH, ciM] = checkInTime.split(':').map(Number);
+            const checkInMinutes = ciH * 60 + ciM;
+            const duration = currentMinutes - checkInMinutes;
             balance = isNaN(duration) ? 0 : duration;
             // observation already contains "Hora Extra (Pendiente de Autorización)"
         } else {
             // Determine which shift we are ending
-            const currentMinutes = now.getHours() * 60 + now.getMinutes();
-            const getMinutes = (time: string) => {
+            const getMinutes = (time: string | null) => {
                 if (!time) return -9999;
                 const [h, m] = time.split(':').map(Number);
                 return h * 60 + m;
@@ -150,10 +149,8 @@ export async function POST(req: Request) {
             }
 
             if (targetExit) {
-                const padTime = (t: string) => t.split(':').map(p => p.padStart(2, '0')).join(':');
-                const checkOutDate = new Date(`${dateStr}T${padTime(timeStr)}`);
-                const exitDate = new Date(`${dateStr}T${targetExit}:00`);
-                const diffMinutes = Math.round((checkOutDate.getTime() - exitDate.getTime()) / 60000);
+                const exitMinutes = getMinutes(targetExit);
+                const diffMinutes = currentMinutes - exitMinutes;
 
                 balance += diffMinutes; // Late exit = positive, Early exit = negative
 

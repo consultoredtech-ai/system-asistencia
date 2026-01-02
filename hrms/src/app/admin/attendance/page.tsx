@@ -210,7 +210,7 @@ export default function AdminAttendancePage() {
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{record.checkIn || '--:--'}</td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{record.checkOut || '--:--'}</td>
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                <span className={`text-sm font-bold ${parseInt(record.balance) > 0 ? 'text-green-600' : parseInt(record.balance) < 0 ? 'text-red-600' : 'text-gray-500'}`}>
+                                                <span className={`text-sm font-bold ${parseInt(String(record.balance)) > 0 ? 'text-green-600' : parseInt(String(record.balance)) < 0 ? 'text-red-600' : 'text-gray-500'}`}>
                                                     {formatBalance(record.balance)}
                                                 </span>
                                             </td>

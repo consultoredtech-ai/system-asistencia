@@ -179,7 +179,15 @@ export default function AdminDashboard() {
                 <div className="bg-white p-6 rounded shadow border-l-4 border-green-500">
                     <h3 className="text-gray-600 text-sm font-medium">Asistencia de Hoy</h3>
                     <p className="text-3xl font-bold text-gray-900">
-                        {attendance.filter(a => a.date === new Date().toISOString().split('T')[0]).length}
+                        {(() => {
+                            const todayChile = new Intl.DateTimeFormat('en-CA', {
+                                timeZone: 'America/Santiago',
+                                year: 'numeric',
+                                month: '2-digit',
+                                day: '2-digit'
+                            }).format(new Date());
+                            return attendance.filter(a => a.date === todayChile).length;
+                        })()}
                     </p>
                 </div>
                 <div className="bg-white p-6 rounded shadow flex flex-col justify-center gap-3">
